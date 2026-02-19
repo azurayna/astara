@@ -62,8 +62,8 @@ def run_operation(setup: str, operation: str, lhs: str, rhs: str) -> str:
 
 def main() -> None:
     st.set_page_config(page_title="Astara Playground", page_icon=":material/functions:")
-    st.title("Astara Type Theory Playground")
-    st.caption("Run your parser/type-checker from astara.py in Streamlit.")
+    st.title(":* Astara Proof Assistant")
+    st.caption("Check your proofs in this playground.")
 
     if "setup" not in st.session_state:
         st.session_state.setup = (
