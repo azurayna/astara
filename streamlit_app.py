@@ -1,3 +1,11 @@
+from __future__ import annotations
+
+from pprint import pformat
+import re
+import unicodedata
+
+import streamlit as st
+
 from astara import Context
 
 APP_BUILD = "2026-02-24.1"
@@ -18,13 +26,14 @@ _SMALL_NUM_NAMES = {
 
 
 def _normalize_input_ops(text: str) -> str:
-    # Accept common unicode operator variants users paste from phones/docs.
-    plus_like = {"＋", "﹢", "⁺", "∔", "⊕", "➕"}
-    minus_like = {"−", "–", "—", "﹣", "⁻", "－"}
-    mul_like = {"×", "✕", "✖", "⨯", "⋅", "·", "∗", "＊"}
-    div_like = {"÷", "／", "∕", "⁄"}
-    eq_like = {"＝"}
-    colon_like = {"﹕", "："}
+    # Normalize compatibility/full-width forms first.
+    text = unicodedata.normalize("NFKC", text)
+
+    # Map common math glyph variants to ASCII operators.
+    plus_like = {"\u2795", "\u2295", "\u2214"}
+    minus_like = {"\u2212", "\u2013", "\u2014"}
+    mul_like = {"\u00d7", "\u2715", "\u2716", "\u2a2f", "\u22c5", "\u00b7", "\u2217"}
+    div_like = {"\u00f7", "\u2215", "\u2044"}
 
     out: list[str] = []
     for ch in text:
@@ -36,16 +45,11 @@ def _normalize_input_ops(text: str) -> str:
             out.append("*")
         elif ch in div_like:
             out.append("/")
-        elif ch in eq_like:
-            out.append("=")
-        elif ch in colon_like:
-            out.append(":")
         else:
             out.append(ch)
     return "".join(out)
 
-
-def _nat_to_int(expr: Any) -> int | None:
+def _nat_to_int(expr: object) -> int | None:
     if isinstance(expr, str):
         if expr == "zero":
             return 0
@@ -71,7 +75,7 @@ def _num_to_expr(num: int) -> str:
     return term
 
 
-def _compute_fixpoint(context: Context, expr: Any, max_steps: int = 64) -> Any:
+def _compute_fixpoint(context: Context, expr: object, max_steps: int = 64) -> object:
     current = context.compute(expr)
     for _ in range(max_steps):
         nxt = context.compute(current)
@@ -81,7 +85,7 @@ def _compute_fixpoint(context: Context, expr: Any, max_steps: int = 64) -> Any:
     return current
 
 
-def _pretty_nat_output(context: Context, reduced: Any, original_input: str) -> str | None:
+def _pretty_nat_output(context: Context, reduced: object, original_input: str) -> str | None:
     as_int = _nat_to_int(reduced)
     if as_int is None:
         # Fallback: try via unparse+parse to catch equivalent succ normal forms.
@@ -554,3 +558,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
