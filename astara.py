@@ -40,7 +40,7 @@ class Context:
             "(A : Type) -> (x : A)"
             " -> (motive : (y : A) -> Id A x y -> Type)"
             " -> motive x (refl A x)"
-            " -> (y : A) -> (p : Id A x y) -> motive y p", 
+            " -> (y : A) -> (p : Id A x y) -> motive y p",
         )
 
     def compute_id(self, fun: Expr, proof: Expr) -> Expr:
@@ -73,8 +73,8 @@ class Context:
         var_type = self.parse(var_type) if isinstance(var_type, str) else var_type
         definition = self.parse(definition) if isinstance(definition, str) else definition
 
-        if not self._is_type_value(self.check(var_type)):
-            raise ValueError(f"Declared type of '{name}' is not a type.")
+        if not self.judge(self.check(var_type), "Type"):
+            raise ValueError(f"Declared type of '{name}' is not of type 'Type'.")
 
         if definition != "axiom" and not self.judge(self.check(definition), var_type):
             raise ValueError(f"Definition of '{name}' does not match its declared type.")
@@ -228,25 +228,8 @@ class Context:
         rule = expression["rule"]
         if rule in ("fun_form", "fun_intro"):
             dom = self.substitute(expression["dom"], variable, value)
-            binder = expression["var"]
-            if binder == variable:
+            if expression["var"] == variable:
                 return {**expression, "dom": dom}
-            if binder in self._free_vars(value):
-                fresh = self._fresh_name(
-                    self._free_vars(expression[("cod" if rule == "fun_form" else "body")])
-                    | self._free_vars(value)
-                    | {binder, variable}
-                )
-                renamed_body = self._rename_free(
-                    expression[("cod" if rule == "fun_form" else "body")], binder, fresh
-                )
-                body_key = "cod" if rule == "fun_form" else "body"
-                return {
-                    **expression,
-                    "dom": dom,
-                    "var": fresh,
-                    body_key: self.substitute(renamed_body, variable, value),
-                }
             body_key = "cod" if rule == "fun_form" else "body"
             body = self.substitute(expression[body_key], variable, value)
             return {**expression, "dom": dom, body_key: body}
@@ -265,10 +248,6 @@ class Context:
         expr2 = self.compute(self.parse(expression2) if isinstance(expression2, str) else expression2)
 
         if isinstance(expr1, str) and isinstance(expr2, str):
-            level1 = self._type_level(expr1)
-            level2 = self._type_level(expr2)
-            if level1 is not None and level2 is not None:
-                return level1 == level2
             return expr1 == expr2
 
         if self._both_rule(expr1, expr2, "fun_form"):
@@ -312,7 +291,7 @@ class Context:
         zero = fun2["var"]
         fun3 = fun2["fun"]
 
-        if fun3 == "Nat.ind":
+        if isinstance(fun3, dict) and fun3.get("fun") == "Nat.ind":
             if self.judge(n, "zero"):
                 return self.compute(zero)
 
@@ -408,10 +387,7 @@ class Context:
 
         if isinstance(expression, str):
             if expression == "Type":
-                return "Type1"
-            type_level = self._type_level(expression)
-            if type_level is not None:
-                return f"Type{type_level + 1}"
+                return "Type"
             if expression not in self.variables:
                 raise ValueError(f"Unknown variable '{expression}'.")
             return self.variables[expression].var_type
@@ -422,12 +398,12 @@ class Context:
             var = expression["var"]
             cod = expression["cod"]
 
-            if not self._is_type_value(self.check(dom)):
-                raise ValueError("Domain of function type is not a type.")
+            if not self.judge(self.check(dom), "Type"):
+                raise ValueError("Domain of function type is not of type 'Type'.")
 
             new_context = self.copy_with_dummy(var, dom)
-            if not new_context._is_type_value(new_context.check(cod)):
-                raise ValueError("Codomain of function type is not a type.")
+            if not new_context.judge(new_context.check(cod), "Type"):
+                raise ValueError("Codomain of function type is not of type 'Type'.")
 
             return "Type"
 
@@ -436,12 +412,11 @@ class Context:
             var = expression["var"]
             body = expression["body"]
 
-            if not self._is_type_value(self.check(dom)):
-                raise ValueError("Domain of function introduction is not a type.")
+            if not self.judge(self.check(dom), "Type"):
+                raise ValueError("Domain of function introduction is not of type 'Type'.")
 
             new_context = self.copy_with_dummy(var, dom)
-            body_type = new_context.check(body)
-            if not new_context._is_type_value(new_context.check(body_type)):
+            if not new_context.judge(new_context.check(new_context.check(body)), "Type"):
                 raise ValueError("Body of function introduction is not an element of a type.")
 
             return {"rule": "fun_form", "dom": dom, "var": var, "cod": new_context.check(body)}
@@ -498,104 +473,86 @@ class Context:
         head, args = self._unwrap_app(expr)
         return head == "Id" and len(args) == 3
 
-    def _is_type_value(self, expr: Expr) -> bool:
-        expr = self.compute(expr) if isinstance(expr, str) else self.compute(expr)
-        return isinstance(expr, str) and self._type_level(expr) is not None
-
-    @staticmethod
-    def _type_level(name: str) -> int | None:
-        if name == "Type":
-            return 0
-        if name.startswith("Type") and name[4:].isdigit():
-            return int(name[4:])
-        return None
-
-    @staticmethod
-    def _free_vars(expr: Expr) -> set[str]:
-        if isinstance(expr, str):
-            return {expr}
-        rule = expr.get("rule")
-        if rule in ("fun_form", "fun_intro"):
-            dom_vars = Context._free_vars(expr["dom"])
-            body_key = "cod" if rule == "fun_form" else "body"
-            body_vars = Context._free_vars(expr[body_key])
-            return dom_vars | (body_vars - {expr["var"]})
-        if rule == "fun_elim":
-            return Context._free_vars(expr["fun"]) | Context._free_vars(expr["var"])
-        return set()
-
-    @staticmethod
-    def _rename_free(expr: Expr, old: str, new: str) -> Expr:
-        if isinstance(expr, str):
-            return new if expr == old else expr
-        rule = expr.get("rule")
-        if rule in ("fun_form", "fun_intro"):
-            dom = Context._rename_free(expr["dom"], old, new)
-            body_key = "cod" if rule == "fun_form" else "body"
-            if expr["var"] == old:
-                return {**expr, "dom": dom, body_key: expr[body_key]}
-            return {**expr, "dom": dom, body_key: Context._rename_free(expr[body_key], old, new)}
-        if rule == "fun_elim":
-            return {
-                "rule": "fun_elim",
-                "fun": Context._rename_free(expr["fun"], old, new),
-                "var": Context._rename_free(expr["var"], old, new),
-            }
-        return expr
-
-    def _fresh_name(self, avoid: set[str]) -> str:
-        candidate = 1
-        while True:
-            name = f"_x{candidate}"
-            if name not in avoid:
-                return name
-            candidate += 1
-
 
 if __name__ == "__main__":
     c = Context()
     c.define(
         "add",
         "Nat -> Nat -> Nat",
-        "(m : Nat) => Nat.ind ((_ : Nat) => Nat -> Nat) ((n : Nat) => n)"
-        "((k : Nat) (rec : Nat -> Nat) => (n : Nat) => succ (rec n)) m",
+        "Nat.ind ((_ : Nat) => Nat -> Nat) ((n : Nat) => n)"
+        "((k : Nat) (rec : Nat -> Nat) (n : Nat) => succ (rec n))",
     )
-
-    print(c.clean_check("Nat -> Nat"))
+    print("Defined add.")
 
     c.define("one", "Nat", "succ zero")
     c.define("two", "Nat", "succ one")
     c.define("three", "Nat", "succ two")
 
-    print(c.judge("add one three", "add two two"))
-    print(c.judge("add one two", "one"))
-
-    print(c.unparse(c.compute("add one two")))
-
-    c.postulate("x", "Nat")
-    c.postulate("y", "Nat")
-    print(c.judge("add x zero", "x"))
-    print(c.judge("add x (succ y)", "succ (add x y)"))
-
-    c.postulate("A", "Type")
-    c.postulate("B", "Type")
-    c.postulate("C", "Type")
-    c.postulate("D", "Type")
     c.define(
-        "compose",
-        "(B -> C) -> (A -> B) -> (A -> C)",
-        "(g : B -> C) => (f : A -> B) => (z : A) => g (f z)",
+        "ap",
+        "(A : Type) -> (B : Type) -> (f : A -> B) -> (x : A) -> (y : A) -> Id A x y -> Id B (f x) (f y)",
+        "(A : Type) (B : Type) (f : A -> B) (x : A) =>" # Goal: (y : A) -> Id A x y -> Id B (f x) (f y)
+        "Id.ind A x"
+        "(((y : A) (_ : Id A x y) => Id B (f x) (f y)))" # motive; Goal: Id B (f x) (f x)
+        "(refl B (f x))"
     )
+    print("Defined ap.")
 
-    c.postulate("f", "A -> B")
-    c.postulate("g", "B -> C")
-    c.postulate("h", "C -> D")
-    print(c.judge("compose h (compose g f)", "compose (compose h g) f"))
-    print("see me!!!")
-    c = Context()
-    c.postulate("A", "Type")
-    c.postulate("x", "A")
-    term = "Id.ind A x ((y : A) => (_ : Id A x y) => A) x x (refl A x)"
-    print(c.judge(term, "x"))          
-    print(c.clean_compute(term))       
+    result = c.clean_compute("ap Nat Nat succ zero zero (refl Nat zero)")
+    if result != "refl Nat (succ zero)":
+        print("Unexpected result for ap computation:", result)
+    else:
+        print("ap computation result as expected.")
+
+    c.define(
+        "add_assoc",
+        "(a : Nat) -> (b : Nat) -> (c : Nat) -> Id Nat (add (add a b) c) (add a (add b c))",
+        "Nat.ind ((a : Nat) => ((b : Nat) -> (c : Nat) -> Id Nat (add (add a b) c) (add a (add b c))))"
+        "((b : Nat) (c : Nat) => refl Nat (add b c))" # base case a = zero
+        "("
+            "(k : Nat) (ih : (b : Nat) -> (c : Nat) -> (Id Nat (add (add k b) c) (add k (add b c)))) (b : Nat) (c : Nat) =>" # Inductive hypothesis with a = k. Goal: Id Nat (add (add (succ k) b) c) (add (succ k) (add b c))
+            "ap Nat Nat succ (add (add k b) c) (add k (add b c)) (ih b c)"
+        ")"
+    )
+    print("Defined add_assoc.")
+
+    result = c.clean_compute("add_assoc one one one")
+    if result != "refl Nat (succ (succ (succ zero)))":
+        print("Unexpected result for add_assoc computation:", result)
+    else:
+        print("add_assoc computation result as expected.")
+
+    # print(c.judge("add one three", "add two two"))
+    # print(c.judge("add one two", "one"))
+
+    # print(c.unparse(c.compute("add one two")))
+
+    # c.postulate("x", "Nat")
+    # c.postulate("y", "Nat")
+    # print(c.judge("add x zero", "x"))
+    # print(c.judge("add x (succ y)", "succ (add x y)"))
+    # print(c.judge("add zero x", "x"))
+    # print(c.judge("add (succ x) y", "succ (add x y)"))
+
+    # c.postulate("A", "Type")
+    # c.postulate("B", "Type")
+    # c.postulate("C", "Type")
+    # c.postulate("D", "Type")
+    # c.define(
+    #     "compose",
+    #     "(B -> C) -> (A -> B) -> (A -> C)",
+    #     "(g : B -> C) => (f : A -> B) => (z : A) => g (f z)",
+    # )
+
+    # c.postulate("f", "A -> B")
+    # c.postulate("g", "B -> C")
+    # c.postulate("h", "C -> D")
+    # print(c.judge("compose h (compose g f)", "compose (compose h g) f"))
+    # print("see me!!!")
+    # c = Context()
+    # c.postulate("A", "Type")
+    # c.postulate("x", "A")
+    # term = "Id.ind A x ((y : A) => (_ : Id A x y) => A) x x (refl A x)"
+    # print(c.judge(term, "x"))
+    # print(c.clean_compute(term))
 
