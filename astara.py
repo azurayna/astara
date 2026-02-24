@@ -1,14 +1,8 @@
 from __future__ import annotations
-from pprint import pformat
-import re
-from typing import Any
-import unicodedata
-
 
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
-
 
 import pyparsing as pp
 
@@ -598,5 +592,4 @@ if __name__ == "__main__":
     term = "Id.ind A x ((y : A) => (_ : Id A x y) => A) x x (refl A x)"
     print(c.judge(term, "x"))          
     print(c.clean_compute(term))       
-
 
