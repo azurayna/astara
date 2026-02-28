@@ -1,0 +1,180 @@
+Astara Streamlit App - Commands and Usage Directory
+===================================================
+
+Version
+-------
+- Build label in app: 2026-02-24.1
+
+
+1) UI Operations
+----------------
+- Compute
+- Check type
+- Judge equality
+- Parse
+- Unparse
+
+
+2) Setup Commands (top text area)
+---------------------------------
+Only these two forms are valid:
+
+1. postulate NAME : TYPE
+2. define NAME : TYPE := EXPR
+
+Examples:
+- postulate A : Type
+- postulate x : A
+- define two : Nat := succ one
+- define id : (A : Type) -> A -> A := (A : Type) => (x : A) => x
+
+
+3) Core Expression Syntax
+-------------------------
+- Names: Nat, zero, succ, add, mul, x, y, S1, Top, etc.
+- Application: f x
+- Multi-application: add one two
+- Parentheses: ( ... )
+- Function type: A -> B
+- Dependent function type: (x : A) -> B
+- Lambda: (x : A) => body
+
+Judge shortcut:
+- lhs = rhs   (can be entered in Expression if RHS box is empty)
+
+
+4) Infix Shortcuts
+------------------
+The app converts these automatically:
+
+- a + b  -> add a b
+- a - b  -> sub a b (or numeric subtraction in pure numeric expressions)
+- a * b  -> mul a b
+- a / b  -> div a b (or exact numeric fraction in pure numeric expressions)
+- a % b  -> numeric modulo (pure numeric expressions only)
+- x : A  -> type assertion (Check type operation)
+
+Notes:
+- Use "/" for division.
+- ":" is treated as type assertion syntax.
+
+
+5) Number Input
+---------------
+- You can type normal numbers: 0, 1, 2, 3, ...
+- In expressions, numbers are mapped to Nat numerals internally.
+
+Examples:
+- Compute: 1+2  -> 3
+- Compute: add one two  -> three
+- Raw normal form (shown under result in Compute) for 3:
+  succ (succ (succ zero))
+
+
+6) What Each Operation Returns
+------------------------------
+Compute:
+- Evaluates expression.
+- Friendly Nat output when possible:
+  - word-style input -> word-style result (example: three)
+  - numeric input -> numeric result (example: 3)
+- Also shows Raw normal form section for compute output.
+
+Check type:
+- Returns inferred type for expression.
+- If expression is x : A, returns True/False for membership.
+
+Judge equality:
+- Returns True/False for judgmental equality.
+- Accepts split lhs/rhs OR single expression with "=".
+- Pure numeric equality is evaluated directly.
+
+Parse:
+- Returns internal AST-like structure.
+
+Unparse:
+- Converts parsed expression back to textual core syntax.
+
+
+7) Built-in Packs (checkboxes)
+------------------------------
+A) Include standard rules
+- Arithmetic and Nat symbols:
+  add, mul, one..ten, eq
+- Equality and algebraic law symbols
+- Integer/rational placeholders: Int, Rat, sub, div
+- Number theory placeholders: prime, divides, etc.
+
+B) Include HoTT terms
+- S1, base, loop
+- S1.rec, S1.ind
+- ua, funext, isContr, isProp, isSet
+
+C) Include topology terms
+- Top, Carrier, OpenSet, ClosedSet, Neighborhood
+- Continuous, Homeomorphism
+- Compact, Connected, PathConnected, Hausdorff, T1, T2
+- FundamentalGroup, CoveringSpace, Homotopy
+
+
+8) Minimal Setup Recipes
+------------------------
+Generic type membership:
+- postulate A : Type
+- postulate x : A
+Then Check type:
+- x      -> A
+- x : A  -> True
+
+Function application typing:
+- postulate A : Type
+- postulate B : Type
+- postulate f : A -> B
+- postulate x : A
+Check type on:
+- f x    -> B
+
+
+9) Common Errors and Fixes
+--------------------------
+Error: Unknown variable '...'
+- Add it in setup via postulate/define, or enable the needed pack checkbox.
+
+Error: Judge equality requires a right-hand expression
+- Fill RHS box, or write lhs = rhs in Expression.
+
+Error about ":" in Compute/Parse/Unparse
+- x : A is a type assertion; use Check type operation.
+
+Error with infix operators not recognized
+- Ensure expression uses + - * / % = and valid spacing/parentheses.
+- App also normalizes many unicode math symbols automatically.
+
+
+10) Practical Examples
+----------------------
+Compute:
+- add one two
+- 1+2
+- (1+2)*2
+- 7/2
+- 7%2
+
+Judge:
+- add one two = three
+- 1+2 = 3
+- 7/2 = 3
+
+Check type:
+- one
+- x : A
+- S1    (with HoTT pack)
+- Continuous (with topology pack)
+
+
+11) Important Limits
+--------------------
+- Many advanced math/HoTT/topology entries are symbolic postulates in this kernel.
+- Not every advanced concept has computational reduction rules.
+- Division in symbolic mode may remain as div(...) unless expression is purely numeric.
+
