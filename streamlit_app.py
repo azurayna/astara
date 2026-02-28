@@ -10,7 +10,7 @@ import streamlit as st
 
 from astara import Context
 
-APP_BUILD = "2026-02-24.1"
+APP_BUILD = "2026-02-27.4"
 
 _SMALL_NUM_NAMES = {
     0: "zero",
@@ -621,9 +621,9 @@ def run_operation(
 
 
 def main() -> None:
-    st.set_page_config(page_title="Theo Proof Assistant Playground", page_icon=":material/functions:")
-    st.title("Astara Type Theory Playground")
-    st.caption(f"Run your parser/type-checker from astara.py in Streamlit. Build: {APP_BUILD}")
+    st.set_page_config(page_title="Theo", page_icon=":material/functions:")
+    st.title("Theo Proof Assistant Playground")
+    st.caption(f"Use this playground to verify your proofs. Build: {APP_BUILD}")
 
     if "setup" not in st.session_state:
         st.session_state.setup = (
