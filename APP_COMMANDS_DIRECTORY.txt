@@ -3,7 +3,7 @@ Astara Streamlit App - Commands and Usage Directory
 
 Version
 -------
-- Build label in app: 2026-02-24.1
+- Build label in app: 2026-02-27.4
 
 
 1) UI Operations
